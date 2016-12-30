@@ -32,6 +32,16 @@ dependencies {
     compile 'com.google.apis:google-api-services-vision:v1-rev22-1.22.0'
     compile 'com.google.api-client:google-api-client-android:1.22.0' exclude module: 'httpclient'
     compile 'com.google.http-client:google-http-client-gson:1.22.0' exclude module: 'httpclient'
+    compile 'com.ardic.android:IoTIgnite:0.7'
+}
+
+repositories {
+    mavenLocal()
+
+    maven {
+        url "https://repo.iot-ignite.com/content/repositories/releases"
+    }
 }
 
 apply plugin: 'com.google.gms.google-services'
+

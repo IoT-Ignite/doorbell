@@ -26,7 +26,10 @@ import android.os.HandlerThread;
 import android.util.Base64;
 import android.util.Log;
 
+import com.example.androidthings.doorbell.listener.DoorActionListener;
 import com.google.android.things.contrib.driver.button.Button;
+import com.google.android.things.pio.Gpio;
+import com.google.android.things.pio.PeripheralManagerService;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ServerValue;
@@ -34,13 +37,15 @@ import com.google.firebase.database.ServerValue;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Doorbell activity that capture a picture from the Raspberry Pi 3
  * Camera on a button press and post it to Firebase and Google Cloud
  * Vision API.
  */
-public class DoorbellActivity extends Activity {
+public class DoorbellActivity extends Activity implements DoorActionListener {
     private static final String TAG = DoorbellActivity.class.getSimpleName();
 
     private FirebaseDatabase mDatabase;
@@ -76,11 +81,35 @@ public class DoorbellActivity extends Activity {
      */
     private final String BUTTON_GPIO_PIN = "BCM21";
 
+    private final String BUZZER_GPIO_PIN = "BCM20";
+
+    private Gpio ledPin;
+
+    private PeripheralManagerService mPeripheralService;
+
+    private IotIgniteHandler mIotIgniteHandler;
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "Doorbell Activity created.");
+
+
+        mIotIgniteHandler = IotIgniteHandler.getInstance(getApplicationContext());
+        mIotIgniteHandler.setDoorActionListener(this);
+        mIotIgniteHandler.start();
+
+
+        mPeripheralService = new PeripheralManagerService();
+
+        try {
+            ledPin = mPeripheralService.openGpio(BUZZER_GPIO_PIN);
+            ledPin.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
+            ledPin.setValue(false);
+        } catch (IOException e) {
+            Log.e(TAG, "IOException on openGpio : " + e);
+        }
 
         // We need permission to access the camera
         if (checkSelfPermission(Manifest.permission.CAMERA)
@@ -108,6 +137,8 @@ public class DoorbellActivity extends Activity {
         } catch (IOException e) {
             Log.e(TAG, "button driver error", e);
         }
+
+
         // Camera code is complicated, so we've shoved it all in this closet class for you.
         mCamera = DoorbellCamera.getInstance();
         mCamera.initializeCamera(this, mCameraHandler, mOnImageAvailableListener);
@@ -123,9 +154,11 @@ public class DoorbellActivity extends Activity {
         mCloudThread.quitSafely();
         try {
             mButton.close();
+            ledPin.close();
         } catch (IOException e) {
             Log.e(TAG, "button driver error", e);
         }
+
     }
 
     /**
@@ -138,6 +171,8 @@ public class DoorbellActivity extends Activity {
             if (pressed) {
                 // Doorbell rang!
                 Log.d(TAG, "button pressed");
+                mIotIgniteHandler.sendData();
+                infoLED(50, 10);
                 mCamera.takePicture();
             }
         }
@@ -148,18 +183,18 @@ public class DoorbellActivity extends Activity {
      */
     private ImageReader.OnImageAvailableListener mOnImageAvailableListener =
             new ImageReader.OnImageAvailableListener() {
-        @Override
-        public void onImageAvailable(ImageReader reader) {
-            Image image = reader.acquireLatestImage();
-            // get image bytes
-            ByteBuffer imageBuf = image.getPlanes()[0].getBuffer();
-            final byte[] imageBytes = new byte[imageBuf.remaining()];
-            imageBuf.get(imageBytes);
-            image.close();
+                @Override
+                public void onImageAvailable(ImageReader reader) {
+                    Image image = reader.acquireLatestImage();
+                    // get image bytes
+                    ByteBuffer imageBuf = image.getPlanes()[0].getBuffer();
+                    final byte[] imageBytes = new byte[imageBuf.remaining()];
+                    imageBuf.get(imageBytes);
+                    image.close();
 
-            onPictureTaken(imageBytes);
-        }
-    };
+                    onPictureTaken(imageBytes);
+                }
+            };
 
     /**
      * Handle image processing in Firebase and Cloud Vision.
@@ -189,5 +224,52 @@ public class DoorbellActivity extends Activity {
                 }
             });
         }
+    }
+
+    private void infoLED(int count, long millis) {
+
+
+        for (int i = 0; i < count; i++) {
+            try {
+                ledPin.setValue(true);
+                try {
+                    Thread.sleep(millis);
+                    ledPin.setValue(false);
+                    Thread.sleep(millis);
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "InterruptedException :" + e);
+                    Thread.currentThread().interrupt();
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "IOException" + e);
+            }
+        }
+
+
+    }
+
+    @Override
+    public void onActionReceived(boolean unlock) {
+        if (unlock) {
+            try {
+                ledPin.setValue(true);
+            } catch (IOException e) {
+                Log.e(TAG,"IOException :" + e);
+            }
+            new Timer().schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        ledPin.setValue(false);
+                    } catch (IOException e) {
+                        Log.e(TAG,"IOException :" + e);
+                    }
+                }
+            }, 5000);
+        } else {
+            infoLED(5, 200);
+        }
+
+
     }
 }

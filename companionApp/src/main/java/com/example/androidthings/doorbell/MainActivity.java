@@ -16,9 +16,12 @@
 package com.example.androidthings.doorbell;
 
 import android.app.Activity;
+import android.content.DialogInterface;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
@@ -31,10 +34,16 @@ public class MainActivity extends Activity {
     private RecyclerView mRecyclerView;
     private DoorbellEntryAdapter mAdapter;
 
+    private IotIgniteHandler mIotIgniteHandler;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+
+        mIotIgniteHandler = IotIgniteHandler.getInstance(getApplicationContext());
+        mIotIgniteHandler.start();
 
         mRecyclerView = (RecyclerView) findViewById(R.id.doorbellView);
         // Show most recent items at the top
@@ -44,11 +53,6 @@ public class MainActivity extends Activity {
 
         // Reference for doorbell events from embedded device
         mDatabaseRef = FirebaseDatabase.getInstance().getReference().child("logs");
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
 
         mAdapter = new DoorbellEntryAdapter(this, mDatabaseRef);
         mRecyclerView.setAdapter(mAdapter);
@@ -63,8 +67,8 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public void onStop() {
-        super.onStop();
+    public void onDestroy() {
+        super.onDestroy();
 
         // Tear down Firebase listeners in adapter
         if (mAdapter != null) {

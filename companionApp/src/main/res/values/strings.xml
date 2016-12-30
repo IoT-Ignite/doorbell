@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">CompanionApp</string>
+    <string name="lock">KEEP LOCKED</string>
+    <string name="unlock">UNLOCK</string>
+    <string name="title_activity_door_lock">DoorLockActivity</string>
+    <string name="questionUnlock"> Someone at the door. Do you want to unlock the door ? </string>
+    <string name="dialogTitle">Door Notification</string>
 </resources>

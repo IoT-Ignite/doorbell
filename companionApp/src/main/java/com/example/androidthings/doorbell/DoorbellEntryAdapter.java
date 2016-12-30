@@ -83,6 +83,7 @@ public class DoorbellEntryAdapter extends FirebaseRecyclerAdapter<DoorbellEntry,
                         ContextCompat.getDrawable(mApplicationContext, R.drawable.ic_image);
                 viewHolder.image.setImageDrawable(placeholder);
             }
+            IotIgniteHandler.getInstance(mApplicationContext).setLastTakenImage(bitmap);
         }
 
         // Display the metadata
@@ -91,8 +92,12 @@ public class DoorbellEntryAdapter extends FirebaseRecyclerAdapter<DoorbellEntry,
 
             int limit = Math.min(keywords.size(), 3);
             viewHolder.metadata.setText(TextUtils.join("\n", keywords.subList(0, limit)));
+            IotIgniteHandler.getInstance(mApplicationContext).setLastTakenImage(null);
         } else {
             viewHolder.metadata.setText("no annotations yet");
+            if (IotIgniteHandler.getInstance(mApplicationContext).getLastTakenImage() != null) {
+                IotIgniteHandler.getInstance(mApplicationContext).startDoorLockActivity();
+            }
         }
     }
 
